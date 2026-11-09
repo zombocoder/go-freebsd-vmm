@@ -71,6 +71,31 @@ var spinPayload = []byte{0xeb, 0xfe}
 // there can be a few.
 const maxExits = 1000
 
+// guestTimeout bounds how long one test may keep a guest running. The
+// payloads finish in microseconds; the margin is for nested
+// virtualization on a loaded CI runner.
+//
+// maxExits does not cover a guest that never exits at all: then Run
+// blocks in the kernel and the loop never gets to count.
+const guestTimeout = 10 * time.Second
+
+// watchGuest fails the test and suspends the VM if the test is still
+// running after guestTimeout. Suspending is what makes a blocked Run
+// return (see TestSuspendBringsTheGuestBack), so a guest that hangs
+// turns into a failure with a reason rather than a test binary that
+// sits there until something kills it.
+func watchGuest(t *testing.T, vm *vmm.VM) {
+	t.Helper()
+
+	timer := time.AfterFunc(guestTimeout, func() {
+		t.Errorf("guest still running after %v; suspending the VM", guestTimeout)
+		if err := vm.Suspend(vmm.SuspendPowerOff); err != nil {
+			t.Errorf("suspending the hung VM: %v", err)
+		}
+	})
+	t.Cleanup(func() { timer.Stop() })
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(harness.Run(m))
 }
@@ -126,6 +151,8 @@ func bootedVM(t *testing.T, payload []byte) (*vmm.VM, *vmm.VCPU) {
 	if err := cpu.Activate(); err != nil {
 		t.Fatalf("Activate: %v", err)
 	}
+
+	watchGuest(t, vm)
 
 	return vm, cpu
 }

@@ -14,6 +14,13 @@ The API may change until v1.0.0.
 - CI on GitHub Actions: formatting and `go mod tidy` on Linux, and build,
   vet and every test level on FreeBSD 14.5 and 15.1 VMs.
 - `make check` and `make fmt-check`.
+- Timeouts for hung tests. Guest-executing tests suspend the VM and fail
+  after 10 s if the guest has not finished, since a guest that never
+  exits leaves `Run` blocked where no loop bound can reach it. `make`
+  passes `-timeout $(TEST_TIMEOUT)` (5m) to `go test`, and CI wraps each
+  run in `go test -timeout` plus `timeout(1)`. CI runs level 3 only on AMD
+  runners: on the Intel ones, guest execution under nested VT-x makes the
+  FreeBSD VM itself stop responding.
 - Community files: Code of Conduct, security policy, issue and pull request
   templates, Dependabot for the workflow actions, and an expanded
   CONTRIBUTING with where help is wanted.

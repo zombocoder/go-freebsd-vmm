@@ -90,7 +90,9 @@ host that runs production guests.
 
 The FreeBSD VMs only get hardware virtualization if the runner passes it
 through. When they do not, `vmm(4)` does not attach and levels 2 and 3 skip
-with the reason; the job log says which happened. That makes CI a guarantee
+with the reason; the job log says which happened. Level 3 runs only when the
+runner is AMD: executing guest code under nested VT-x on the Intel runners
+hangs the whole FreeBSD VM, and runners are Intel or AMD at random. That makes CI a guarantee
 for building, vetting and level 1 on both releases, and not a substitute for
 running levels 2 and 3 on real hardware. Say in the pull request where you
 ran them.

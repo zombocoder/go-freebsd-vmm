@@ -45,13 +45,15 @@ jobs:
     # needs VT-x or AMD-V inside that VM, i.e. nested virtualization on the
     # runner. Where the VM does not get it, vmm.ko fails to attach and those
     # tests skip with the reason rather than fail; the log says which
-    # happened. They create VMs named govmm-test-* and destroy them, and the
+    # happened. Level 3 also runs only on AMD runners; see below. They create VMs named govmm-test-* and destroy them, and the
     # whole VM is discarded afterwards.
     name: FreeBSD ${{ matrix.release }}
     runs-on: ubuntu-latest
-    # A normal run takes a few minutes; occasionally the VM hangs while
-    # booting under nested virtualization. Fail fast so the job can be re-run.
-    timeout-minutes: 25
+    # A normal run takes about two minutes. The test commands below carry
+    # their own, shorter timeouts so a hung test is reported with stacks;
+    # this one catches the VM itself hanging, while booting or because
+    # nested virtualization took the guest kernel down.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -95,11 +97,34 @@ jobs:
               echo "::notice::vmm(4) unavailable in this VM; integration tests will skip"
             fi
 
+            # Two layers of timeout. go test -timeout fails a hung test
+            # binary and prints every goroutine's stack, which names the
+            # test that stopped. timeout(1) is the backstop for a process
+            # stuck in the kernel that the first cannot stop.
+            gotest() {
+              timeout -k 30s 6m go test -count=1 -timeout 4m "$@"
+            }
+
             # Packages run in parallel on purpose: the harness must keep
             # concurrent test binaries apart.
-            go test -count=1 -v ./...
-            go test -count=1 -race ./...
-            go test -count=1 -v -tags vmm_privileged ./tests/privileged/
+            gotest -v ./...
+            gotest -race ./...
+
+            # Level 3 executes guest code. Under nested VT-x on the Intel
+            # runners that takes the whole FreeBSD VM down (it stops
+            # answering ssh as soon as the first guest instruction runs),
+            # so there is nothing a test timeout could report. Nested
+            # AMD-V works. Runners are Intel or AMD at random, so decide
+            # per run.
+            model=$(sysctl -n hw.model)
+            case "$(sysctl -n kern.vm_guest):$model" in
+            none:* | *:*AMD*)
+              gotest -v -tags vmm_privileged ./tests/privileged/
+              ;;
+            *)
+              echo "::notice::level 3 skipped: guest execution under nested VT-x hangs this VM ($model)"
+              ;;
+            esac
 
             # Nothing may be left behind.
             if ls /dev/vmm/govmm-test-* 2>/dev/null; then

@@ -23,6 +23,11 @@ CWARNFLAGS=	-Wall -Wextra -Werror
 # stay at -lvmmapi.
 DEVLDFLAGS=	-L$$(pwd)/$(BUILDDIR) -lutil
 
+# Every suite finishes in seconds. A test binary still running after
+# this is hung, and go test then fails it with every goroutine's stack,
+# which names the test that stopped.
+TEST_TIMEOUT?=	5m
+
 all: build
 
 # Build everything. Expects libvmmapi to be installed, or BUILDDIR to
@@ -31,12 +36,12 @@ build:
 	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) build ./...
 
 test:
-	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test ./...
+	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -timeout $(TEST_TIMEOUT) ./...
 
 # The race detector is useful on the pure-Go layer. Integration tests
 # that drive the kernel are tagged and excluded by default.
 race:
-	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -race ./...
+	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -timeout $(TEST_TIMEOUT) -race ./...
 
 bench:
 	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -run '^$$' -bench . -benchmem ./...
@@ -95,4 +100,4 @@ clean:
 # Level 3 tests: they enter the guest and touch host hardware, so they
 # need root and vmm(4) and are excluded from an ordinary run.
 privileged:
-	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -tags vmm_privileged -v ./tests/privileged/
+	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -timeout $(TEST_TIMEOUT) -tags vmm_privileged -v ./tests/privileged/
