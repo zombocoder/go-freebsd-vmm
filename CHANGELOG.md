@@ -8,6 +8,14 @@ The API may change until v1.0.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The race detector never ran.** FreeBSD enables ASLR by default, and a
+  `-race` test binary then prints "This sanitizer is not compatible with
+  enabled ASLR" and exits 0, so `go test -race` reported ok without running
+  a test. `make race` and CI now run it under `proccontrol -m aslr -s
+  disable`. Run that way, it finds no races.
+
 ## [1.1.0] - 2026-11-09
 
 FreeBSD 15 support, CI, and the community files for outside contributors.

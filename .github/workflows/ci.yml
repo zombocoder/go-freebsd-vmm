@@ -105,10 +105,18 @@ jobs:
               timeout -k 30s 6m go test -count=1 -timeout 4m "$@"
             }
 
+            # proccontrol: the race detector refuses to run with ASLR,
+            # which FreeBSD enables by default, and its test binaries then
+            # exit 0 having run nothing, so go test reports ok.
+            gorace() {
+              proccontrol -m aslr -s disable \
+                timeout -k 30s 6m go test -count=1 -timeout 4m -race "$@"
+            }
+
             # Packages run in parallel on purpose: the harness must keep
             # concurrent test binaries apart.
             gotest -v ./...
-            gotest -race ./...
+            gorace ./...
 
             # Level 3 executes guest code. Under nested VT-x on the Intel
             # runners that takes the whole FreeBSD VM down (it stops

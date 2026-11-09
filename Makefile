@@ -28,6 +28,13 @@ DEVLDFLAGS=	-L$$(pwd)/$(BUILDDIR) -lutil
 # which names the test that stopped.
 TEST_TIMEOUT?=	5m
 
+# The race detector refuses to run with ASLR, which FreeBSD enables by
+# default: the test binary prints "This sanitizer is not compatible with
+# enabled ASLR" and exits 0, so go test reports ok without having run a
+# single test. proccontrol(1) turns ASLR off for go test and everything
+# it starts.
+RACE=	proccontrol -m aslr -s disable
+
 all: build
 
 # Build everything. Expects libvmmapi to be installed, or BUILDDIR to
@@ -41,7 +48,7 @@ test:
 # The race detector is useful on the pure-Go layer. Integration tests
 # that drive the kernel are tagged and excluded by default.
 race:
-	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -timeout $(TEST_TIMEOUT) -race ./...
+	CGO_LDFLAGS="$(DEVLDFLAGS)" $(RACE) $(GO) test -timeout $(TEST_TIMEOUT) -race ./...
 
 bench:
 	CGO_LDFLAGS="$(DEVLDFLAGS)" $(GO) test -run '^$$' -bench . -benchmem ./...
