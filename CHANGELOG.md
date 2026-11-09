@@ -8,6 +8,12 @@ The API may change until v1.0.0.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-09
+
+FreeBSD 15 support, CI, and the community files for outside contributors.
+No breaking changes: `SetLowMemoryLimit` keeps its signature and reports
+`ErrUnsupported` where FreeBSD no longer allows it.
+
 ### Added
 
 - `FeatureLowMemoryLimit`, false from libvmmapi 3.0 (FreeBSD 15) on.
@@ -48,7 +54,9 @@ The API may change until v1.0.0.
 ### Verified
 
 - All three test levels on FreeBSD 15.1-RELEASE amd64, AMD Ryzen 7 5700G
-  (AMD-V/SVM). Previously only FreeBSD 14.3 on Intel had been exercised.
+  (AMD-V/SVM), on bare metal. Previously only FreeBSD 14.3 on Intel had
+  been exercised.
+- All three test levels in CI on FreeBSD 14.5 and 15.1, nested on AMD EPYC.
 
 ## [1.0.0] - 2026-10-10
 
@@ -183,5 +191,6 @@ Several behaviours of `libvmmapi` shape the API and are worth recording:
   `Supports(FeatureSnapshot)` answers for the entry points rather than
   for the kernel.
 
-[Unreleased]: https://github.com/zombocoder/go-freebsd-vmm/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/zombocoder/go-freebsd-vmm/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/zombocoder/go-freebsd-vmm/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/zombocoder/go-freebsd-vmm/releases/tag/v1.0.0
