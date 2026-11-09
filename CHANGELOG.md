@@ -28,6 +28,10 @@ The API may change until v1.0.0.
 - **`SetLowMemoryLimit` on FreeBSD 15.** libvmmapi 3.0 removed
   `vm_set_lowmem_limit()`; the limit is fixed at `VM_LOWMEM_LIMIT`. The
   call now reports `ErrUnsupported` there instead of failing to link.
+- **C bridge with clang 20+** (FreeBSD 14.5). `make cwarn` failed on
+  `-Wdefault-const-init-field-unsafe`: the snapshot request declared a
+  `struct vm_snapshot_meta`, whose buffer has const members, without an
+  initializer. It is now built with a designated initializer.
 - **Integration test cleanup.** Each test package swept every
   `govmm-test-*` VM from `TestMain`, including the live VMs of other test
   packages that `go test ./tests/...` runs in parallel. That showed up as

@@ -1345,28 +1345,24 @@ govmm_vm_snapshot_req(struct vmctx *ctx, const char *dev_name, int dev_req,
     int op, void *buf, size_t buflen, size_t *used)
 {
 	struct govmm_result r;
-	struct vm_snapshot_meta meta;
-
-	memset(&meta, 0, sizeof(meta));
-	meta.dev_name = dev_name;
-	meta.dev_req = (enum snapshot_req)dev_req;
-	meta.op = (enum vm_snapshot_op)op;
-
 	/*
-	 * buf_start and buf_size are const in the ABI, so the whole
-	 * buffer descriptor is built by assignment through a local copy
-	 * rather than field by field.
+	 * buf_start and buf_size are const in the ABI, so they can only be
+	 * set by an initializer. Initializing the whole object here also
+	 * zeroes the remaining members, and keeps clang 20+ quiet: it
+	 * warns (-Wdefault-const-init-field-unsafe) about any declaration
+	 * of a struct with const members that leaves them uninitialized.
 	 */
-	{
-		struct vm_snapshot_buffer b = {
+	struct vm_snapshot_meta meta = {
+		.dev_name = dev_name,
+		.dev_req = (enum snapshot_req)dev_req,
+		.buffer = {
 			.buf_start = buf,
 			.buf_size = buflen,
 			.buf = buf,
 			.buf_rem = buflen,
-		};
-
-		memcpy(&meta.buffer, &b, sizeof(b));
-	}
+		},
+		.op = (enum vm_snapshot_op)op,
+	};
 
 	r.rc = vm_snapshot_req(ctx, &meta);
 	r.err = errno;
