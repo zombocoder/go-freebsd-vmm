@@ -1,7 +1,10 @@
 # go-freebsd-vmm
 
+[![CI](https://github.com/zombocoder/go-freebsd-vmm/actions/workflows/ci.yml/badge.svg)](https://github.com/zombocoder/go-freebsd-vmm/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/zombocoder/go-freebsd-vmm.svg)](https://pkg.go.dev/github.com/zombocoder/go-freebsd-vmm)
-[![FreeBSD](https://img.shields.io/badge/platform-FreeBSD-red.svg)](https://www.freebsd.org/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zombocoder/go-freebsd-vmm)](https://goreportcard.com/report/github.com/zombocoder/go-freebsd-vmm)
+[![Release](https://img.shields.io/github/v/release/zombocoder/go-freebsd-vmm?sort=semver)](https://github.com/zombocoder/go-freebsd-vmm/releases)
+[![FreeBSD](https://img.shields.io/badge/FreeBSD-14%20%7C%2015-red.svg)](https://www.freebsd.org/)
 [![Go Version](https://img.shields.io/badge/go-%3E%3D1.22-blue.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-green.svg)](LICENSE)
 
@@ -114,13 +117,16 @@ go run ./examples/inspect vm01
 | Release | `VMMAPI_VERSION` | `APIVersion()` | Status |
 | --- | --- | --- | --- |
 | 14-STABLE | `0200` | 2.0 | supported, developed against |
-| 15 | `0300` | 3.0 | expected to work |
+| 15 | `0300` | 3.0 | supported, tested on 15.1 |
 | CURRENT | varies | varies | best effort |
 
-The bridge calls only the symbol set that `VMMAPI_VERSION` 2.0 defines, which
-is the full post-`struct vcpu` API and is present unchanged in later releases.
-There are no version conditionals in the C layer, so one build serves all
-three.
+The bridge calls the symbol set that `VMMAPI_VERSION` 2.0 defines, the full
+post-`struct vcpu` API. Two things changed in 3.0 and are handled in the C
+layer: the memory segment identifiers moved to `<dev/vmm/vmm_mem.h>`, which is
+included when it exists, and `vm_set_lowmem_limit()` was removed, which is the
+one place the bridge branches on `VMMAPI_VERSION`. `SetLowMemoryLimit` reports
+`ErrUnsupported` there, and `Supports(FeatureLowMemoryLimit)` says so in
+advance.
 
 `VMMAPI_VERSION` is written as a leading-zero literal, which C reads as octal:
 `0200` is 128 and `0300` is 192. `APIVersion()` therefore decodes the digits of
@@ -255,6 +261,7 @@ Three levels:
 make test     # level 1: pure Go, no kernel needed
 make race     # the same, under the race detector
 make lint     # go vet, staticcheck, and the C bridge under -Werror
+make check    # formatting, vet, the C bridge and level 1: run before a PR
 ```
 
 Level 2 lives in `tests/` and drives a real kernel. It needs root and
@@ -281,9 +288,13 @@ which is what makes `VM_RUN` and exit decoding testable without a guest
 operating system. A second payload spins forever, so that a blocked `Run`
 returning on `Suspend` can be observed.
 
-All three levels are green on FreeBSD 14.3 amd64: 114 pure-Go tests, 43
-integration tests, 20 privileged tests. The snapshot cases skip, because the
-development kernel was built without `BHYVE_SNAPSHOT`.
+All three levels are green on FreeBSD 14.3 amd64 (Intel VT-x) and on
+FreeBSD 15.1 amd64 (AMD-V, Ryzen 7 5700G). The snapshot cases skip, because
+neither kernel was built with `BHYVE_SNAPSHOT`, and on 15 the low memory
+limit case skips because that release fixes the limit.
+
+Test packages run in parallel, so the sweep spares any `govmm-test-*` VM
+whose name carries the pid of another process that is still running.
 
 ## Performance
 
@@ -333,9 +344,10 @@ known gaps, in the order they would most likely be useful.
   resumption. Paged-mode address translation and `ReadGuestVirtual` across a
   real page table are only covered by the identity mapping that real mode
   gives, so a payload that enables paging would test them properly.
-- **CI.** The pure-Go tests run anywhere; the integration tests need a FreeBSD
-  host with `vmm(4)` and privilege. Both levels exist and are green, but
-  nothing runs them automatically yet.
+- **CI on hardware.** CI builds and tests on FreeBSD 14.5 and 15.1 VMs, but
+  those only reach levels 2 and 3 when the runner offers nested
+  virtualization. A self-hosted FreeBSD runner would make them a guarantee
+  rather than a best effort.
 
 ## Status
 
@@ -376,6 +388,15 @@ dependency only ever points downward: `go-freebsd-vmm` must not depend on
 
 Device models, `tap(4)`, bridges, disk images, ZFS zvols, UEFI paths and
 command-line construction are all out of scope here, permanently.
+
+## Contributing
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for how to
+run the tests, what CI checks, and where help is wanted (much of it needs
+hardware the maintainer does not have). Please follow the
+[Code of Conduct](CODE_OF_CONDUCT.md) and report security issues privately as
+described in [SECURITY.md](SECURITY.md). [CHANGELOG.md](CHANGELOG.md) has the
+release history.
 
 ## License
 

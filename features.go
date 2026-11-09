@@ -2,7 +2,11 @@
 
 package vmm
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/zombocoder/go-freebsd-vmm/internal/vmmapi"
+)
 
 // Feature names a capability of this library on the system it was built
 // for.
@@ -61,6 +65,13 @@ const (
 	// it. VM.ResetPassthrough therefore reports ErrUnsupported.
 	FeaturePPTReset Feature = "ppt-reset"
 
+	// FeatureLowMemoryLimit reports whether VM.SetLowMemoryLimit can
+	// move the boundary between low and high guest memory.
+	//
+	// False from libvmmapi 3.0 (FreeBSD 15) on, where the limit is
+	// fixed and the call that changed it no longer exists.
+	FeatureLowMemoryLimit Feature = "lowmem-limit"
+
 	// FeatureRTC reports whether the guest's real time clock can be
 	// read and written.
 	FeatureRTC Feature = "rtc"
@@ -111,6 +122,9 @@ var features = map[Feature]bool{
 
 	// Needs a libvmmapi that does not assert on the mapping style.
 	FeatureSparseMemory: APIVersion().AtLeast(Version{Major: 3}),
+
+	// Removed in libvmmapi 3.0.
+	FeatureLowMemoryLimit: vmmapi.HaveSetLowMemLimit(),
 
 	// No libvmmapi entry point exists for this on any supported
 	// release.

@@ -42,6 +42,16 @@ func TestSparseMemoryTracksAPIVersion(t *testing.T) {
 	}
 }
 
+// TestLowMemoryLimitTracksAPIVersion ties the feature to libvmmapi 3.0,
+// which removed vm_set_lowmem_limit().
+func TestLowMemoryLimitTracksAPIVersion(t *testing.T) {
+	want := !APIVersion().AtLeast(Version{Major: 3})
+	if got := Supports(FeatureLowMemoryLimit); got != want {
+		t.Errorf("Supports(FeatureLowMemoryLimit) = %v, want %v for libvmmapi %v",
+			got, want, APIVersion())
+	}
+}
+
 func TestFeaturesAreSortedAndAvailable(t *testing.T) {
 	got := Features()
 	if len(got) == 0 {

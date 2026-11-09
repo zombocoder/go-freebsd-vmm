@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt-formatted (run 'gofmt -w .'):"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Check go.mod is tidy
+        run: go mod tidy -diff
+
+  freebsd:
+    # The library builds only on FreeBSD/amd64 and links the base system's
+    # libvmmapi through cgo, so everything after formatting runs inside a
+    # FreeBSD VM under QEMU on the Linux runner.
+    #
+    # Level 1 (pure Go) always runs. Levels 2 and 3 need vmm(4), which
+    # needs VT-x or AMD-V inside that VM, i.e. nested virtualization on the
+    # runner. Where the VM does not get it, vmm.ko fails to attach and those
+    # tests skip with the reason rather than fail; the log says which
+    # happened. They create VMs named govmm-test-* and destroy them, and the
+    # whole VM is discarded afterwards.
+    name: FreeBSD ${{ matrix.release }}
+    runs-on: ubuntu-latest
+    # A normal run takes a few minutes; occasionally the VM hangs while
+    # booting under nested virtualization. Fail fast so the job can be re-run.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # 14.x: libvmmapi 2.0. 15.x: libvmmapi 3.0, with the memory
+        # segment and low memory limit changes the bridge handles.
+        release: ["14.5", "15.1"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and test in FreeBSD VM
+        uses: vmactions/freebsd-vm@v1.5.9
+        with:
+          release: ${{ matrix.release }}
+          copyback: false
+          cache-after-prepare: true
+          prepare: |
+            ASSUME_ALWAYS_YES=yes pkg install -y go
+          run: |
+            set -e
+            export GOFLAGS=-buildvcs=false
+            freebsd-version -ku
+            go version
+            sysctl -n hw.model
+            grep VMMAPI_VERSION /usr/include/vmmapi.h
+
+            # libvmmapi is in the base system; a host without it would
+            # need "make libvmmapi" first.
+            ls /usr/lib/libvmmapi.so* || make libvmmapi
+
+            make cwarn
+            go vet ./...
+            go build ./...
+            go build ./examples/...
+            go vet -tags vmm_privileged ./tests/privileged/
+
+            # Does this VM have hardware virtualization? Report, do not
+            # fail: the tests below skip on their own when it does not.
+            if kldload -n vmm; then
+              echo "vmm(4) loaded; integration tests will run"
+            else
+              echo "::notice::vmm(4) unavailable in this VM; integration tests will skip"
+            fi
+
+            # Packages run in parallel on purpose: the harness must keep
+            # concurrent test binaries apart.
+            go test -count=1 -v ./...
+            go test -count=1 -race ./...
+            go test -count=1 -v -tags vmm_privileged ./tests/privileged/
+
+            # Nothing may be left behind.
+            if ls /dev/vmm/govmm-test-* 2>/dev/null; then
+              echo "::error::tests left VMs under /dev/vmm"
+              exit 1
+            fi

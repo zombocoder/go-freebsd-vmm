@@ -1,29 +1,99 @@
-# Contributing
+# Contributing to go-freebsd-vmm
 
-## Building and testing
+Thanks for your interest in improving the library! Bug reports, fixes,
+bindings for `libvmmapi` calls that are still missing, tests on hardware we
+have not seen, examples and documentation are all welcome.
+
+By participating you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Security problems should be reported privately, see [SECURITY.md](SECURITY.md).
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [Running Tests](#running-tests)
+- [Continuous Integration](#continuous-integration)
+- [Project rules](#project-rules)
+- [The C bridge](#the-c-bridge)
+- [Performance](#performance)
+- [Tests](#tests)
+- [Style](#style)
+- [Submitting Changes](#submitting-changes)
+- [Where Help Is Wanted](#where-help-is-wanted)
+
+## Getting Started
+
+### Prerequisites
+
+- FreeBSD 14 or 15 on amd64
+- Go 1.22+ (`pkg install go`)
+- The base system C compiler (cgo), `<vmmapi.h>` and `libvmmapi`
+- For the integration levels: root (or `doas`), `vmm(4)` loaded, and a CPU
+  with VT-x or AMD-V. Nested virtualization works if the outer hypervisor
+  passes it through.
+
+The library does not build anywhere else; on other platforms the build stops
+with an explanation. Formatting and `go mod tidy` can still be checked there.
+
+### Setup
 
 ```sh
-make test        # pure-Go tests; no kernel required
-make race        # the same under the race detector
-make lint        # go vet, staticcheck, and the C bridge under -Werror
-make bench       # benchmarks
-make privileged  # level 3; needs root and vmm(4)
+git clone https://github.com/<your-username>/go-freebsd-vmm.git
+cd go-freebsd-vmm
+make build
+make test
 ```
 
 On a FreeBSD installation built without bhyve, `<vmmapi.h>` is present but
-there is no library to link against. Build one from the system sources first:
+there is no library to link against. Build one from the system sources into
+`build/` first (nothing is vendored):
 
 ```sh
 make libvmmapi
 ```
 
-Integration tests under `tests/` drive a real kernel. They need root and
-`vmm(4)`, and skip with the reason when either is missing:
+## Running Tests
+
+| Command | Runs as | What it covers |
+|---|---|---|
+| `make test` | any user | Level 1: pure Go, no kernel. Level 2 tests skip themselves. |
+| `make race` | any user | The same under the race detector. |
+| `make check` | any user | Formatting, `go vet`, the C bridge under `-Werror`, and `make test`. |
+| `sudo -E make test` | root | Adds level 2 (`tests/`): creates, configures and destroys real VMs. |
+| `sudo -E make privileged` | root | Level 3 (`tests/privileged`): enters the guest, injects interrupts, touches host hardware. |
+| `make bench` | root for most | Register and statistics benchmarks. |
+
+With `doas`, which resets the environment, pass `PATH` through:
+`doas env PATH=$PATH make test`.
 
 ```sh
 kldload vmm
-sudo -E make test
+sudo -E go test -count=1 -run Stats -v ./tests/vcpu
 ```
+
+Integration tests only touch VMs they create, named `govmm-test-<pid>-<random>`,
+and destroy them through `t.Cleanup`. Each package also sweeps leftovers from
+processes that are no longer running. Still, they run as root and load
+`vmm(4)`: prefer a test machine or a VM with nested virtualization over a
+host that runs production guests.
+
+## Continuous Integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
+`main` and every pull request:
+
+- **Lint** (Linux): `gofmt` and `go mod tidy -diff`.
+- **FreeBSD 14.5 and 15.1** (QEMU VMs via
+  [vmactions/freebsd-vm](https://github.com/vmactions/freebsd-vm)): installs
+  Go, checks the C bridge under `-Werror`, runs `go vet`, builds all packages
+  and examples, and runs every test level as root, including under the race
+  detector. It fails if any `govmm-test-*` VM is left behind.
+
+The FreeBSD VMs only get hardware virtualization if the runner passes it
+through. When they do not, `vmm(4)` does not attach and levels 2 and 3 skip
+with the reason; the job log says which happened. That makes CI a guarantee
+for building, vetting and level 1 on both releases, and not a substitute for
+running levels 2 and 3 on real hardware. Say in the pull request where you
+ran them.
 
 ## Project rules
 
@@ -122,3 +192,40 @@ logging framework, no CLI framework, no configuration or validation library.
 Explain why, not just what. If a change works around a behaviour of
 `libvmmapi` or the kernel, name it: the next person to read the code will
 otherwise take the workaround for an accident.
+
+## Submitting Changes
+
+1. Create a branch from `main`.
+2. Make the change with tests; update doc comments, README and examples when
+   the public API changes, and add an entry to [CHANGELOG.md](CHANGELOG.md)
+   under "Unreleased".
+3. Run `make check` and, if the change touches anything below the pure-Go
+   layer, `sudo -E make test` and `sudo -E make privileged` on FreeBSD.
+4. Open a pull request; the template has a short checklist. CI must be green.
+
+Commit messages: `type(scope): summary` (e.g. `fix(memory): include
+dev/vmm/vmm_mem.h on FreeBSD 15`), a blank line, then what changed and why.
+Common types are `feat`, `fix`, `docs`, `test`, `refactor`, `ci`, `chore`.
+
+Avoid breaking public API changes within 1.x. When a FreeBSD release removes
+something, keep the Go API, report `ErrUnsupported`, and add a `Feature` that
+answers in advance, as `SetLowMemoryLimit` does on FreeBSD 15.
+
+## Where Help Is Wanted
+
+Most of these need hardware or a kernel configuration the maintainer does not
+have, which makes them good first contributions for someone who does:
+
+- **Snapshots** on a kernel built with `options BHYVE_SNAPSHOT`: the save and
+  restore primitives exist but have never been seen to succeed.
+- **PCI passthrough** with a real device bound to `ppt(4)`: assignment, MMIO
+  mapping, MSI and MSI-X.
+- **A guest in protected or long mode**: a small payload that enables paging,
+  to test address translation and `ReadGuestVirtual` across real page tables.
+- **`arm64` and `riscv64`**: bindings written against those architectures'
+  headers (VGIC, APLIC), on a host that can run them.
+- **Reports from other CPUs and releases**: if the levels 2 and 3 tests pass
+  (or fail) on hardware not listed in the README, open an issue with the
+  output.
+
+Questions and design discussions are welcome in GitHub issues.

@@ -10,6 +10,39 @@ The API may change until v1.0.0.
 
 ### Added
 
+- `FeatureLowMemoryLimit`, false from libvmmapi 3.0 (FreeBSD 15) on.
+- CI on GitHub Actions: formatting and `go mod tidy` on Linux, and build,
+  vet and every test level on FreeBSD 14.5 and 15.1 VMs.
+- `make check` and `make fmt-check`.
+- Community files: Code of Conduct, security policy, issue and pull request
+  templates, Dependabot for the workflow actions, and an expanded
+  CONTRIBUTING with where help is wanted.
+
+### Fixed
+
+- **Builds on FreeBSD 15.** The memory segment identifiers (`VM_SYSMEM`,
+  `VM_BOOTROM`, ...) moved to `<dev/vmm/vmm_mem.h>`, which the bridge now
+  includes when it exists. They were also renumbered for NUMA guests
+  (`VM_BOOTROM` is 8 rather than 1); the constants come from the header,
+  so nothing here hard-codes either set.
+- **`SetLowMemoryLimit` on FreeBSD 15.** libvmmapi 3.0 removed
+  `vm_set_lowmem_limit()`; the limit is fixed at `VM_LOWMEM_LIMIT`. The
+  call now reports `ErrUnsupported` there instead of failing to link.
+- **Integration test cleanup.** Each test package swept every
+  `govmm-test-*` VM from `TestMain`, including the live VMs of other test
+  packages that `go test ./tests/...` runs in parallel. That showed up as
+  intermittent ENXIO in `TestConcurrentStatsAreSerialised`. The sweep now
+  spares VMs named for another process that is still running.
+
+### Verified
+
+- All three test levels on FreeBSD 15.1-RELEASE amd64, AMD Ryzen 7 5700G
+  (AMD-V/SVM). Previously only FreeBSD 14.3 on Intel had been exercised.
+
+## [1.0.0] - 2026-10-10
+
+### Added
+
 Everything below is the first working slice of the library: the cgo bridge,
 the ownership and error models, and the VMM primitives that do not require
 entering the guest.
@@ -139,4 +172,5 @@ Several behaviours of `libvmmapi` shape the API and are worth recording:
   `Supports(FeatureSnapshot)` answers for the entry points rather than
   for the kernel.
 
-[Unreleased]: https://github.com/zombocoder/go-freebsd-vmm/commits/master
+[Unreleased]: https://github.com/zombocoder/go-freebsd-vmm/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/zombocoder/go-freebsd-vmm/releases/tag/v1.0.0

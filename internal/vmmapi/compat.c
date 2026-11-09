@@ -394,11 +394,36 @@ govmm_vm_get_lowmem_limit(struct vmctx *ctx)
 	return (vm_get_lowmem_limit(ctx));
 }
 
+/*
+ * libvmmapi 3.0 (FreeBSD 15) removed vm_set_lowmem_limit(): the limit
+ * became the fixed VM_LOWMEM_LIMIT. A missing function cannot be
+ * detected by the preprocessor, so this is the one place the bridge
+ * branches on VMMAPI_VERSION. Both values are octal literals, which
+ * compare correctly as long as both sides are written the same way.
+ */
+#if VMMAPI_VERSION < 0300
+#define	GOVMM_HAVE_SET_LOWMEM_LIMIT	1
+#else
+#define	GOVMM_HAVE_SET_LOWMEM_LIMIT	0
+#endif
+
+int
+govmm_have_set_lowmem_limit(void)
+{
+
+	return (GOVMM_HAVE_SET_LOWMEM_LIMIT);
+}
+
 void
 govmm_vm_set_lowmem_limit(struct vmctx *ctx, uint32_t limit)
 {
 
+#if GOVMM_HAVE_SET_LOWMEM_LIMIT
 	vm_set_lowmem_limit(ctx, limit);
+#else
+	(void)ctx;
+	(void)limit;
+#endif
 }
 
 int

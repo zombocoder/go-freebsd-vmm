@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a binding for a vmm(4) / libvmmapi operation, or an API improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This library binds what `vmm(4)` and `libvmmapi` expose and stays low level.
+        VM configuration, device models, networking, storage and running `bhyve`
+        belong to a higher layer and are out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The task you are trying to accomplish and why the current API does not cover it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: libvmmapi
+    attributes:
+      label: libvmmapi function or ioctl
+      description: Which `vm_*` call (or `bhyvectl` option) does this correspond to, and on which FreeBSD releases does it exist?
+      render: c
+
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed API
+      description: How would you like to call it from Go? Rough sketches are fine.
+      render: go
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this myself

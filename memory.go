@@ -226,6 +226,11 @@ func (vm *VM) LowMemoryLimit() uint32 {
 
 // SetLowMemoryLimit changes where low memory stops. It only affects
 // later SetupMemory calls, not memory already allocated.
+//
+// libvmmapi 3.0 (FreeBSD 15) fixed the limit and removed the call that
+// changed it, so there this reports ErrUnsupported.
+// Supports(FeatureLowMemoryLimit) answers the same question without the
+// call.
 func (vm *VM) SetLowMemoryLimit(limit uint32) error {
 	const op = "vm_set_lowmem_limit"
 
@@ -234,6 +239,11 @@ func (vm *VM) SetLowMemoryLimit(limit uint32) error {
 		return err
 	}
 	defer release()
+
+	if !Supports(FeatureLowMemoryLimit) {
+		return fmt.Errorf("vmm: changing the low memory limit needs libvmmapi older than 3.0: %w",
+			ErrUnsupported)
+	}
 
 	ctx.SetLowMemLimit(limit)
 	return nil

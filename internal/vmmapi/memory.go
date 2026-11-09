@@ -79,8 +79,16 @@ func (c *Context) LowMemLimit() uint32 {
 	return uint32(C.govmm_vm_get_lowmem_limit(c.ptr))
 }
 
+// HaveSetLowMemLimit reports whether libvmmapi can change the low
+// memory limit. It cannot from libvmmapi 3.0 on, where the limit is
+// fixed.
+func HaveSetLowMemLimit() bool {
+	return C.govmm_have_set_lowmem_limit() != 0
+}
+
 // SetLowMemLimit changes the low memory limit. It only affects
-// subsequent SetupMemory calls.
+// subsequent SetupMemory calls, and does nothing where
+// HaveSetLowMemLimit reports false.
 func (c *Context) SetLowMemLimit(limit uint32) {
 	if !c.valid() {
 		return

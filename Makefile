@@ -47,6 +47,16 @@ vet:
 fmt:
 	$(GO) fmt ./...
 
+# Fail, listing the files, if anything is not gofmt-clean.
+fmt-check:
+	@unformatted=$$(gofmt -l .); \
+	if [ -n "$$unformatted" ]; then \
+	    echo "not gofmt-clean:"; echo "$$unformatted"; exit 1; \
+	fi
+
+# What to run before sending a change: no root needed.
+check: fmt-check vet cwarn test
+
 lint: vet cwarn
 	@command -v staticcheck >/dev/null 2>&1 && \
 	    CGO_LDFLAGS="$(DEVLDFLAGS)" staticcheck ./... || \
@@ -80,7 +90,7 @@ clean:
 	rm -rf $(BUILDDIR)
 	$(GO) clean ./...
 
-.PHONY: all build test race bench vet fmt lint cwarn libvmmapi privileged clean
+.PHONY: all build test race bench vet fmt fmt-check check lint cwarn libvmmapi privileged clean
 
 # Level 3 tests: they enter the guest and touch host hardware, so they
 # need root and vmm(4) and are excluded from an ordinary run.

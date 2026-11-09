@@ -6,6 +6,7 @@ package lifecycle_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"syscall"
 	"testing"
@@ -252,4 +253,42 @@ func skipIfUnavailable(t *testing.T, err error) bool {
 		}
 	}
 	return false
+}
+
+// TestSweepSparesOtherLiveTestBinaries guards the cleanup that runs from
+// every package's TestMain. go test runs packages in parallel, so a sweep
+// must leave alone the VMs of another test binary that is still running,
+// and only collect what this process or a dead one left behind.
+func TestSweepSparesOtherLiveTestBinaries(t *testing.T) {
+	// pid 1 is init, which is always alive and is never a test binary.
+	foreign := fmt.Sprintf("%s1-%08x", harness.NamePrefix, os.Getpid())
+	own := harness.Name(t)
+
+	for _, name := range []string{foreign, own} {
+		if err := vmm.Create(name); err != nil {
+			if skipIfUnavailable(t, err) {
+				return
+			}
+			t.Fatalf("Create(%q) = %v", name, err)
+		}
+	}
+	t.Cleanup(func() {
+		for _, name := range []string{foreign, own} {
+			if vm, err := vmm.Open(name); err == nil {
+				_ = vm.Destroy()
+			}
+		}
+	})
+
+	harness.Sweep()
+
+	vm, err := vmm.Open(foreign)
+	if err != nil {
+		t.Fatalf("Sweep destroyed %q, which belongs to a live process: %v", foreign, err)
+	}
+	vm.Close()
+
+	if _, err := vmm.Open(own); !errors.Is(err, syscall.ENOENT) {
+		t.Errorf("Open(%q) after Sweep = %v, want ENOENT", own, err)
+	}
 }

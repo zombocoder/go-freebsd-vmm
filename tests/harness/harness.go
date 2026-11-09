@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -167,6 +168,11 @@ func skipReason(err error) (string, bool) {
 //
 // It runs from TestMain so that a run interrupted part way through does
 // not leave objects under /dev/vmm for the next one to trip over.
+//
+// go test runs packages in parallel, one process each, so a VM named for
+// another process that is still alive belongs to a test in progress and
+// is left alone. Only VMs of this process, of a process that has exited,
+// or with a name this harness did not produce are destroyed.
 func Sweep() {
 	entries, err := os.ReadDir(vmmDir)
 	if err != nil {
@@ -177,7 +183,7 @@ func Sweep() {
 
 	for _, entry := range entries {
 		name := entry.Name()
-		if !strings.HasPrefix(name, NamePrefix) {
+		if !strings.HasPrefix(name, NamePrefix) || ownedByLiveProcess(name) {
 			continue
 		}
 		vm, err := vmm.Open(name)
@@ -189,6 +195,23 @@ func Sweep() {
 				filepath.Join(vmmDir, name), err)
 		}
 	}
+}
+
+// ownedByLiveProcess reports whether a VM name made by Name belongs to a
+// process other than this one that is still running.
+func ownedByLiveProcess(name string) bool {
+	pidPart, _, ok := strings.Cut(strings.TrimPrefix(name, NamePrefix), "-")
+	if !ok {
+		return false
+	}
+	pid, err := strconv.Atoi(pidPart)
+	if err != nil || pid <= 0 || pid == os.Getpid() {
+		return false
+	}
+	// Signal 0 checks for existence without delivering anything. EPERM
+	// still means the process exists.
+	err = syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
 // Run is the body of TestMain for every integration test package. It

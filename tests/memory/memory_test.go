@@ -50,6 +50,9 @@ func TestSetupMemorySizes(t *testing.T) {
 // low memory limit goes to a second region starting at HighMemoryBase,
 // leaving the 32-bit MMIO hole clear.
 func TestSetupMemoryAboveLowLimit(t *testing.T) {
+	if !vmm.Supports(vmm.FeatureLowMemoryLimit) {
+		t.Skip("libvmmapi fixes the low memory limit")
+	}
 	vm := harness.RequireVM(t)
 
 	// Keep the limit small so the test does not have to allocate

@@ -31,6 +31,17 @@
 #include <machine/vmm_dev.h>
 #include <machine/vmm_snapshot.h>
 
+/*
+ * FreeBSD 15 moved the memory segment identifiers (VM_SYSMEM,
+ * VM_BOOTROM, ...) out of <machine/vmm.h> into a machine-independent
+ * header, and renumbered them to make room for one system memory
+ * segment per guest NUMA domain. FreeBSD 14 has no such header. Test
+ * for the file rather than the version, so a backport is picked up too.
+ */
+#if __has_include(<dev/vmm/vmm_mem.h>)
+#include <dev/vmm/vmm_mem.h>
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -263,6 +274,7 @@ struct govmm_result	govmm_vm_setup_memory(struct vmctx *ctx, size_t len,
 size_t			govmm_vm_get_lowmem_size(struct vmctx *ctx);
 size_t			govmm_vm_get_highmem_size(struct vmctx *ctx);
 uint32_t		govmm_vm_get_lowmem_limit(struct vmctx *ctx);
+int			govmm_have_set_lowmem_limit(void);
 void			govmm_vm_set_lowmem_limit(struct vmctx *ctx,
 			    uint32_t limit);
 int			govmm_vm_get_memflags(struct vmctx *ctx);

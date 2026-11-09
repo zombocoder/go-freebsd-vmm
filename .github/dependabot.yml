@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # The module has no dependencies beyond the standard library and the
+  # system libvmmapi, so only the workflow actions need watching.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

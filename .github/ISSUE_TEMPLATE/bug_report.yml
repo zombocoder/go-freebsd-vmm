@@ -1,0 +1,89 @@
+name: Bug report
+description: Something in the library does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check existing issues first.
+        For security problems, use [private reporting](https://github.com/zombocoder/go-freebsd-vmm/security/advisories/new) instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: A small Go program or the exact API calls, and how the VM was set up (created by the library, or by `bhyve`/`bhyvectl` and then opened).
+      render: go
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Error messages and relevant output
+      description: |
+        Error values (the `*vmm.Error` text keeps the operation, VM, vCPU and errno), panics, and if useful
+        `bhyvectl --vm=<name> --get-stats` or `dmesg | grep -i vmm`. Remove anything you consider private.
+      render: shell
+
+  - type: input
+    id: freebsd
+    attributes:
+      label: FreeBSD version
+      description: Output of `freebsd-version -ku`
+      placeholder: "15.1-RELEASE-p6 15.1-RELEASE-p6"
+    validations:
+      required: true
+
+  - type: input
+    id: cpu
+    attributes:
+      label: CPU
+      description: Output of `sysctl -n hw.model`. Intel VT-x and AMD-V take different paths in vmm(4).
+      placeholder: "AMD Ryzen 7 5700G with Radeon Graphics"
+    validations:
+      required: true
+
+  - type: input
+    id: go
+    attributes:
+      label: Go version
+      description: Output of `go version`
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Library version
+      description: Module version or commit hash you are using
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where does it run?
+      options:
+        - bare metal
+        - nested (FreeBSD inside another hypervisor)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: root
+    attributes:
+      label: Running as root?
+      options:
+        - "yes"
+        - "no"
+    validations:
+      required: true
